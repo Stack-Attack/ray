@@ -113,6 +113,7 @@ class RouterMetricsManager:
         # Regularly aggregate and push autoscaling metrics to controller
         self.metrics_pusher = MetricsPusher()
         self.metrics_store = InMemoryMetricsStore()
+        self.metrics = list()
         # The config for the deployment this router sends requests to will be broadcast
         # by the controller. That means it is not available until we get the first
         # update. This includes an optional autoscaling config.
@@ -263,51 +264,57 @@ class RouterMetricsManager:
         """
 
         self._controller_handle.record_handle_metrics.remote(
-            send_timestamp=time.time(),
+            # send_timestamp=time.time(),
             deployment_id=self._deployment_id,
             handle_id=self._handle_id,
             actor_id=self._self_actor_id,
             handle_source=self._handle_source,
-            **self._get_aggregated_requests(),
+            metrics=self.metrics,
         )
+        self.metrics.clear()
 
     def _add_autoscaling_metrics_point(self):
         """Adds metrics point for queued and running requests at replicas.
 
         Also prunes keys in the in memory metrics store with outdated datapoints.
         """
+        total_requests = self.num_queued_requests
+        for replica_requests in self.num_requests_sent_to_replicas.values():
+            total_requests += replica_requests
 
-        timestamp = time.time()
-        self.metrics_store.add_metrics_point(
-            {QUEUED_REQUESTS_KEY: self.num_queued_requests}, timestamp
-        )
-        if RAY_SERVE_COLLECT_AUTOSCALING_METRICS_ON_HANDLE:
-            self.metrics_store.add_metrics_point(
-                self.num_requests_sent_to_replicas, timestamp
-            )
+        self.metrics.append((total_requests, time.time()))
 
-        # Prevent in memory metrics store memory from growing
-        start_timestamp = time.time() - self.autoscaling_config.look_back_period_s
-        self.metrics_store.prune_keys_and_compact_data(start_timestamp)
-
-    def _get_aggregated_requests(self):
-        running_requests = dict()
-        if RAY_SERVE_COLLECT_AUTOSCALING_METRICS_ON_HANDLE and self.autoscaling_config:
-            look_back_period = self.autoscaling_config.look_back_period_s
-            running_requests = {
-                replica_id: self.metrics_store.window_average(
-                    replica_id, time.time() - look_back_period
-                )
-                # If data hasn't been recorded yet, return current
-                # number of queued and ongoing requests.
-                or num_requests
-                for replica_id, num_requests in self.num_requests_sent_to_replicas.items()  # noqa: E501
-            }
-
-        return {
-            "queued_requests": self.num_queued_requests,
-            "running_requests": running_requests,
-        }
+    #     timestamp = time.time()
+    #     self.metrics_store.add_metrics_point(
+    #         {QUEUED_REQUESTS_KEY: self.num_queued_requests}, timestamp
+    #     )
+    #     if RAY_SERVE_COLLECT_AUTOSCALING_METRICS_ON_HANDLE:
+    #         self.metrics_store.add_metrics_point(
+    #             self.num_requests_sent_to_replicas, timestamp
+    #         )
+    #
+    #     # Prevent in memory metrics store memory from growing
+    #     start_timestamp = time.time() - self.autoscaling_config.look_back_period_s
+    #     self.metrics_store.prune_keys_and_compact_data(start_timestamp)
+    #
+    # def _get_aggregated_requests(self):
+    #     running_requests = dict()
+    #     if RAY_SERVE_COLLECT_AUTOSCALING_METRICS_ON_HANDLE and self.autoscaling_config:
+    #         look_back_period = self.autoscaling_config.look_back_period_s
+    #         running_requests = {
+    #             replica_id: self.metrics_store.window_average(
+    #                 replica_id, time.time() - look_back_period
+    #             )
+    #                         # If data hasn't been recorded yet, return current
+    #                         # number of queued and ongoing requests.
+    #                         or num_requests
+    #             for replica_id, num_requests in self.num_requests_sent_to_replicas.items()  # noqa: E501
+    #         }
+    #
+    #     return {
+    #         "queued_requests": self.num_queued_requests,
+    #         "running_requests": running_requests,
+    #     }
 
     async def shutdown(self):
         """Shutdown metrics manager gracefully."""
