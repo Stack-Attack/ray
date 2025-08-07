@@ -14,7 +14,10 @@ from ray.serve._private.constants import (
     SERVE_LOGGER_NAME,
 )
 from ray.serve._private.deployment_info import DeploymentInfo
-from ray.serve._private.metrics_utils import InMemoryMetricsStore, consolidate_metrics_stores
+from ray.serve._private.metrics_utils import (
+    InMemoryMetricsStore,
+    consolidate_metrics_stores,
+)
 from ray.serve._private.router import QUEUED_REQUESTS_KEY
 from ray.serve._private.utils import get_capacity_adjusted_num_replicas
 

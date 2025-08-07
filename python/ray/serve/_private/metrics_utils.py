@@ -5,13 +5,13 @@ import statistics
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable, DefaultDict, Dict, Hashable, List, Optional, \
-    Iterable
+from typing import Callable, DefaultDict, Dict, Hashable, Iterable, List, Optional
 
 from ray.serve._private.constants import (
     METRICS_PUSHER_GRACEFUL_SHUTDOWN_TIMEOUT_S,
     SERVE_LOGGER_NAME,
 )
+
 QUEUED_REQUESTS_KEY = "queued"
 
 logger = logging.getLogger(SERVE_LOGGER_NAME)
