@@ -206,23 +206,29 @@ class InMemoryMetricsStore:
 
         Returns:
             A tuple of (float, int) where the first element is the aggregated value
-            and the second element is the count of values aggregated. Returns None
-            if no values are available.
+            and the second element is the number of series aggregated (valid keys).
+            Returns None if no values are available.
         """
-        values = (
-            timeseries.value for key in keys for timeseries in self.data.get(key, ())
-        )
+        report_count = 0
+        def values():
+            nonlocal report_count
+            for key in keys:
+                series = self.data.get(key, ())
+                if not series:
+                    continue
+                report_count += 1
+                for ts in series:
+                    yield ts.value
 
-        # Return None if no values are available.
+        it = values()
         _empty = object()
-        first = next(values, _empty)
+        first = next(it, _empty)  # avoid calling on empty
         if first is _empty:
             return None
 
-        counter = _Counted(chain((first,), values))
-        agg_result = aggregate_fn(counter)
-
-        return agg_result, counter.count
+        agg_result = aggregate_fn(
+            chain((first,), it))  # mean/min/max/sum over floats
+        return agg_result, report_count
 
     def get_latest(
         self,
